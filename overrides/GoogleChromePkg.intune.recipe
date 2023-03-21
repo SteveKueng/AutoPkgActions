@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Identifier</key>
+	<string>local.intune.GoogleChromePkg</string>
+	<key>Input</key>
+	<dict>
+		<key>NAME</key>
+		<string>GoogleChrome</string>
+		<key>description</key>
+		<string>Chrome is a fast, simple, and secure web browser, built for the modern web.</string>
+		<key>developer</key>
+		<string>Google</string>
+		<key>display_name</key>
+		<string>Google Chrome</string>
+	</dict>
+	<key>ParentRecipe</key>
+	<string>com.github.stevekueng.intune.googlechromepkg</string>
+	<key>ParentRecipeTrustInfo</key>
+	<dict>
+		<key>non_core_processors</key>
+		<dict>
+			<key>com.github.haircut.processors/AppIconExtractor</key>
+			<dict>
+				<key>git_hash</key>
+				<string>ac703b8003e8d11b0c8a45ea4d1ebe3dda3d9906</string>
+				<key>path</key>
+				<string>~/Library/AutoPkg/RecipeRepos/com.github.autopkg.haircut-recipes/Processors/AppIconExtractor.py</string>
+				<key>sha256_hash</key>
+				<string>987505b62bd49686796ca4bc5f3339b5c7d75637cc9eca7fb20127d179dcd497</string>
+			</dict>
+			<key>com.github.stevekueng.processors/IntuneImporter</key>
+			<dict>
+				<key>git_hash</key>
+				<string>db0c7723338d7231e824f81d0fb35a857ce5b17c</string>
+				<key>path</key>
+				<string>~/Library/AutoPkg/RecipeRepos/com.github.SteveKueng.recipes/IntuneImporter/IntuneImporter.py</string>
+				<key>sha256_hash</key>
+				<string>3efec4b3fe2f0021864a30db22a6509794582977dff6f6843056b6ff11842449</string>
+			</dict>
+		</dict>
+		<key>parent_recipes</key>
+		<dict>
+			<key>com.github.autopkg.download.googlechromepkg</key>
+			<dict>
+				<key>git_hash</key>
+				<string>83f0b66496abd578d1c70fca2f6f1a6b204939a5</string>
+				<key>path</key>
+				<string>~/Library/AutoPkg/RecipeRepos/com.github.autopkg.recipes/GoogleChrome/GoogleChromePkg.download.recipe</string>
+				<key>sha256_hash</key>
+				<string>2de26c035de26d0a4d01ad46ff3d50c0f2d2f555920319c678a55412a42babf5</string>
+			</dict>
+			<key>com.github.stevekueng.intune.googlechromepkg</key>
+			<dict>
+				<key>git_hash</key>
+				<string>db0c7723338d7231e824f81d0fb35a857ce5b17c</string>
+				<key>path</key>
+				<string>~/Library/AutoPkg/RecipeRepos/com.github.SteveKueng.recipes/GoogleChrome/GoogleChromePkg.intune.recipe</string>
+				<key>sha256_hash</key>
+				<string>c1af5b71b7d29b5ffeb5dae101efab7eb5de0ff5edc7568c5a9a14ab461b5335</string>
+			</dict>
+		</dict>
+	</dict>
+</dict>
+</plist>
