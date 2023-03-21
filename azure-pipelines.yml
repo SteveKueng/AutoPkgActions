@@ -1,7 +1,7 @@
 # This pipeline runs the autopkg_tools.py script and adds the packages to Munki
 
 schedules:
-  - cron: 00 7 * * 1-5
+  - cron: 00 6 * * 1-5
     branches:
       include:
       - main
@@ -11,7 +11,6 @@ pool:
 
 variables:
   OVERRIDESEXISTS: False
-  DEVOPS_ORGNAME: "ikueng"
   OVERRIDES_DIR: $(Build.SourcesDirectory)/overrides
   REPO_DIR: $(Build.SourcesDirectory)
 
