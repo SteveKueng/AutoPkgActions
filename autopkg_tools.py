@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/local/autopkg/python
 
 # BSD-3-Clause
 # Copyright (c) Facebook, Inc. and its affiliates.
@@ -23,20 +23,13 @@ import json
 import plistlib
 import requests
 import subprocess
-import base64
 from pathlib import Path
 from optparse import OptionParser
-from datetime import datetime
 
 DEBUG = os.environ.get("DEBUG", False)
 TEAMS_WEBHOOK = os.environ.get("TEAMS_WEBHOOK")
-MUNKI_REPO = os.environ.get("MUNKI_REPO")
 OVERRIDES_DIR = os.environ.get("OVERRIDES_DIR")
 RECIPE_TO_RUN = os.environ.get("RECIPE", None)
-DEVOPS_ORGNAME = os.environ.get("DEVOPS_ORGNAME")
-DEVOPS_PROJECT = os.environ.get("MUNKI_DEVOPS_PROJECT")
-DEVOPS_REPO = os.environ.get("MUNKI_DEVOPS_REPO_NAME")
-
 
 class Recipe(object):
     def __init__(self, path):
@@ -58,25 +51,32 @@ class Recipe(object):
         return self._keys
 
     @property
-    def branch(self):
-        return (
-            "{}_{}".format("pipeline/autopkg/apps/" + self.name, self.updated_version)
-            .strip()
-            .replace(" ", "")
-            .replace(")", "-")
-            .replace("(", "-")
-        )
-
-    @property
     def updated_version(self):
-        if not self.results or not self.results["imported"]:
+        if not self.results or not "imported" in self.results or self.results["imported"] == []:
             return None
-
         return self.results["imported"][0]["version"].strip().replace(" ", "")
 
     @property
     def name(self):
         return self.plist["Input"]["NAME"]
+
+    @property
+    def appID(self):
+        if not self.results or not "imported" in self.results or self.results["imported"] == []:
+            return False
+        return self.results["imported"][0]["appID"].strip().replace(" ", "")
+    
+    @property
+    def installed_as_managed(self):
+        if not self.results or not "imported" in self.results or self.results["imported"] == []:
+            return False
+        return self.results["imported"][0]["installed_as_managed"].strip().replace(" ", "")
+    
+    @property
+    def ignore_app_version(self):
+        if not self.results or not "imported" in self.results or self.results["imported"] == []:
+            return False
+        return self.results["imported"][0]["ignore_app_version"].strip().replace(" ", "")
 
     def verify_trust_info(self):
         cmd = ["/usr/local/bin/autopkg",
@@ -122,7 +122,7 @@ class Recipe(object):
         if report_data["summary_results"]:
             # This means something happened
             munki_results = report_data["summary_results"].get(
-                "munki_importer_summary_result", {}
+                "intune_importer_summary_result", {}
             )
             imported_items.extend(munki_results.get("data_rows", []))
 
@@ -165,70 +165,14 @@ class Recipe(object):
                 self.updated = True
 
         return self.results
-
-
-### GIT FUNCTIONS
-def git_run(cmd):
-    cmd = ["git"] + cmd
-    hide_cmd_output = True
-
-    if DEBUG:
-        print("Running " + " ".join(cmd))
-        hide_cmd_output = False
-
-    try:
-        result = subprocess.run(" ".join(cmd), shell=True,
-                                cwd=MUNKI_REPO, capture_output=hide_cmd_output)
-    except subprocess.CalledProcessError as e:
-        print(e.stderr)
-        raise e
-
-
-def current_branch():
-    git_run(["rev-parse", "--abbrev-ref", "HEAD"])
-
-
-def checkout(branch, new=True):
-    if current_branch() != "main" and branch != "main":
-        checkout("main", new=False)
-
-    gitcmd = ["checkout"]
-    if new:
-        gitcmd += ["-b"]
-
-    gitcmd.append(branch)
-    # Lazy branch exists check
-    try:
-        git_run(gitcmd)
-    except subprocess.CalledProcessError as e:
-        if new:
-            checkout(branch, new=False)
-        else:
-            raise e
-
+        
 
 ### Recipe handling
 def handle_recipe(recipe, opts):
     if not opts.disable_verification:
         recipe.verify_trust_info()
-        if recipe.verified is False:
-            recipe.update_trust_info()
     if recipe.verified in (True, None):
         recipe.run()
-        if recipe.results["imported"]:
-            checkout(recipe.branch)
-            for imported in recipe.results["imported"]:
-                git_run(["add", f"'pkgs/{ imported['pkg_repo_path'] }'"])
-                git_run(["add", f"'pkgsinfo/{ imported['pkginfo_path'] }'"])
-            git_run(
-                [
-                    "commit",
-                    "-m",
-                    f"'Updated { recipe.name } to { recipe.updated_version }'",
-                ]
-            )
-            git_run(["push", "--set-upstream", "origin", recipe.branch])
-
     return recipe
 
 
@@ -257,17 +201,6 @@ def parse_recipes(recipes):
             recipe_list = parser(f)
 
     return map(Recipe, recipe_list)
-
-## Icon handling
-def import_icons():
-    branch_name = "pipeline/autopkg/icons/icon_import_{}".format(datetime.now().strftime("%Y-%m-%d"))
-    checkout(branch_name)
-    result = subprocess.check_call(
-        "/usr/local/munki/iconimporter " + MUNKI_REPO, shell=True
-    )
-    git_run(["add", "icons/"])
-    git_run(["commit", "-m", "Added new icons"])
-    git_run(["push", "--set-upstream", "origin", f"{branch_name}"])
 
 
 def teams_alert(recipe, opts):
@@ -299,9 +232,9 @@ def teams_alert(recipe, opts):
         task_title = "Imported %s %s" % (
             recipe.name, str(recipe.updated_version))
         task_description = (
-            "\r- Catalogs: `%s`" % recipe.results["imported"][0]["catalogs"] + "\r \r"
-            + "\r- Package Path: `%s`" % recipe.results["imported"][0]["pkg_repo_path"] + "\r \r"
-            + "\r- Pkginfo Path: `%s`" % recipe.results["imported"][0]["pkginfo_path"]
+            "\r- appID: `%s`" % recipe.appID + "\r \r"
+            + "\r- installed_as_managed: `%s`" % recipe.installed_as_managed + "\r \r"
+            + "\r- ignore_app_version: `%s`" % recipe.ignore_app_version
         )
     else:
         # Also no updates
@@ -365,17 +298,9 @@ def teams_alert(recipe, opts):
                                                         "actions": [
                                                             {
                                                                 "type": "Action.OpenUrl",
-                                                                "id": "298d5a47-bac1-bf7e-96b7-face84dba69e",
-                                                                "title": "Create Pull request",
-                                                                "url": "https://dev.azure.com/"+DEVOPS_ORGNAME+"/"+DEVOPS_PROJECT+"/_git/"+DEVOPS_REPO+"/pullrequestcreate?sourceRef=" + "{}_{}".format("pipeline/autopkg/apps/" + recipe.name, recipe.updated_version) + "&targetRef=main",
-                                                                "style": "positive",
-                                                                "isPrimary": True
-                                                            },
-                                                            {
-                                                                "type": "Action.OpenUrl",
                                                                 "id": "24cf7a2b-4919-0ef1-235f-a84667ae7192",
-                                                                "title": "See in DevOps portal",
-                                                                "url": "https://dev.azure.com/"+DEVOPS_ORGNAME+"/"+DEVOPS_PROJECT+"/_git/"+DEVOPS_REPO+"/branches?_a=all"
+                                                                "title": "See in Intune",
+                                                                "url": f"https://endpoint.microsoft.com/#view/Microsoft_Intune_Apps/SettingsMenu/~/0/appId/{recipe.appID}"
                                                             },
                                                         ]
                                                     }
@@ -417,28 +342,16 @@ def main():
         "-l", "--list", help="Path to a plist or JSON list of recipe names."
     )
     parser.add_option(
-        "-g",
-        "--gitrepo",
-        help="Path to git repo. Defaults to MUNKI_REPO from Autopkg preferences.",
-        default=MUNKI_REPO,
-    )
-    parser.add_option(
         "-d",
         "--debug",
         action="store_true",
-        help="Disables sending Slack alerts and adds more verbosity to output.",
+        help="Disables sending Teams alerts and adds more verbosity to output.",
     )
     parser.add_option(
         "-v",
         "--disable_verification",
         action="store_true",
         help="Disables recipe verification.",
-    )
-    parser.add_option(
-        "-i",
-        "--icons",
-        action="store_true",
-        help="Run iconimporter against git munki repo.",
     )
 
     (opts, _) = parser.parse_args()
@@ -468,10 +381,6 @@ def main():
                 title_file.write(f"Update trust for {title}")
             with open("pull_request_body", "a+") as body_file:
                 body_file.writelines(lines)
-
-    if opts.icons:
-        import_icons()
-
 
 if __name__ == "__main__":
     main()
